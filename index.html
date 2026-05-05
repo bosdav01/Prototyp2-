@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neon Typing Arcade — Grundreihe V2</title>
+    <title>Neon Typing Arcade — Grundreihe V2.1</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
         :root { --cyan:#00f5ff;--pink:#ff2bd6;--purple:#9c62ff;--yellow:#fff066;--green:#37ff9f;--red:#ff4e6a;--white:#f5fbff;--muted:#9db0c0;--orange:#ff9a3d;--panel:rgba(7,12,28,0.96); }
@@ -102,7 +102,7 @@
 </head>
 <body>
     <h1 class="page-title">Arcade Trainer</h1>
-    <p class="page-subtitle">Lektion 1 — Grundreihe: A S D F &nbsp; J K L Ö &nbsp;(V2)</p>
+    <p class="page-subtitle">Lektion 1 — Grundreihe: A S D F &nbsp; J K L Ö &nbsp;(V2.1)</p>
 
     <div id="hudBar">
         <div class="hud-cell" id="hMode">MODE: LOBBY</div>
@@ -155,7 +155,7 @@
                             <div class="difficulty-pill pill-hard">Schwer</div>
                             <h3>Type Dash</h3>
                             <p>Geometry Dash. Tippe Buchstaben und Wörter, um über Hindernisse zu springen.</p>
-                            <div class="progression-note">Buchstaben → Paare → Wörter</div>
+                            <div class="progression-note">Isolation → Bigramme → Wörter</div>
                             <div class="best-score" id="bestDash">Bester: —</div>
                             <button class="bootBtn" data-game="dash">Start</button>
                         </div>
@@ -188,19 +188,23 @@
 
     <script>
     /* ═══════════════════════════════════════════════
-       PROTOTYP 2 — Anpassungen gemäss BA Iteration 1
+       PROTOTYP 2.1 — Type-Dash Wortprogression
        ═══════════════════════════════════════════════
-       Änderungen gegenüber V1:
-       1. Breitere Progressions-Ranges (sanfterer Start, höheres Ende)
-       2. Astro Keys: grösserer Spawn-Abstand (Überlappung behoben)
-       3. Pause/Abbruch mit ESC während des Spiels
-       4. Level-Up-Banner bei Stufenwechsel
-       5. Helper-Text blendet nach 5s automatisch aus
-       6. 8 Tickets statt 5 (Einzelinterviews, tiefere Beobachtung)
-       7. Spürbarere Schwierigkeitsunterschiede zwischen Modi
-       8. Type Dash: mehr Hindernisvariation
-       9. Lobby-Reihenfolge: Leicht → Mittel → Schwer
-      10. V2-Kennzeichnung im Subtitle
+       Änderungen gegenüber V2:
+       1. Type-Dash Wortpools nach Lektionsplan-Phasen aufgebaut:
+          L1: Isolation Kernfinger (f j d k)
+          L2: Isolation alle 8 Tasten
+          L3: Bigramm-Wechselanschläge (fj jf dk kd sl ls aö öa)
+          L4: Gemischte Bigramme aus Phase 3
+          L5: Kurzwörter 2–3 Buchstaben (Phase 4)
+          L6: Wörter 3–4 Buchstaben (Phase 4/5)
+          L7: 4-Buchstaben-Wörter (Phase 5)
+          L8: Lange Wörter (Phase 6: salsa, skala, falls...)
+       2. Shuffle-Bag-Algorithmus statt Math.random:
+          Jedes Wort im Pool wird einmal verwendet, bevor sich
+          etwas wiederholt → eliminiert das gefühlte Repeat-Problem
+       3. Direkte aufeinanderfolgende Wiederholung verhindert
+          (auch beim Bag-Refill am Übergang)
        ═══════════════════════════════════════════════ */
 
     const C = document.getElementById('gameCanvas');
@@ -215,21 +219,36 @@
     let rounds = 0;
 
     /* ── Level-Konfiguration ──────────────────────
-       V2: Breitere Ranges.
-       - Astro startet bei 0.36 (statt 0.48), endet bei 0.78
-       - Beat startet bei 0.88 (statt 1.05), endet bei 1.55
-       - Dash startet bei 1.5 (statt 1.7), endet bei 2.5
+       V2.1: Type-Dash-Wörter folgen den Lektionsphasen.
+       Pools sind grösser → mehr Variation.
+       Shuffle-Bag (siehe chW) sorgt für gleichmässige Verteilung.
     ──────────────────────────────────────────────── */
     const LCFG = {
         dash:[
-            {sn:0,    words:['a','s','d','f','j','k','l','ö'], speed:1.5, gap:440, types:['spike']},
-            {sn:120,  words:['a','s','d','f','j','k','l','ö'], speed:1.6, gap:420, types:['spike']},
-            {sn:280,  words:['da','ja','la','sa','öl','al'],   speed:1.72, gap:400, types:['spike','gap']},
-            {sn:460,  words:['das','als','ja','da','all','öl'], speed:1.85, gap:380, types:['spike','gap']},
-            {sn:670,  words:['das','als','all','fad','öls'],    speed:2.0,  gap:360, types:['spike','gap','saw']},
-            {sn:900,  words:['fall','saal','lass','fass','kalk'], speed:2.15, gap:340, types:['spike','gap','saw','triple']},
-            {sn:1160, words:['falls','salsa','klass','saldo'],  speed:2.32, gap:320, types:['spike','gap','saw','triple','diamond']},
-            {sn:1440, words:['falls','salsa','klass','saldo','flaks'], speed:2.5, gap:300, types:['spike','gap','saw','triple','diamond']},
+            // L1 — Phase 1 Isolation: nur Kernfinger (Zeige- & Mittelfinger)
+            {sn:0,    words:['f','j','d','k'],
+             speed:1.5, gap:440, types:['spike']},
+            // L2 — Phase 1 Isolation: alle 8 Grundreihe-Tasten
+            {sn:120,  words:['a','s','d','f','j','k','l','ö'],
+             speed:1.6, gap:420, types:['spike']},
+            // L3 — Phase 2 Wechselanschläge auf benachbarten Fingern
+            {sn:280,  words:['fj','jf','dk','kd','sl','ls','aö','öa'],
+             speed:1.72, gap:400, types:['spike','gap']},
+            // L4 — Phase 3 gemischte Bigramme (cross-hand)
+            {sn:460,  words:['al','la','as','sa','da','ja','fa','ka','ad','ös','lö','öl'],
+             speed:1.85, gap:380, types:['spike','gap']},
+            // L5 — Phase 4 kurze Wörter (2–3 Buchstaben)
+            {sn:670,  words:['ja','al','das','als','all','aal','fad','öd','aas','ass','las','lös','öl'],
+             speed:2.0,  gap:360, types:['spike','gap','saw']},
+            // L6 — Phase 4/5 Übergang zu 3–4 Buchstaben
+            {sn:900,  words:['das','als','all','fall','fass','lass','fad','aal','aas','lös','jass','dass'],
+             speed:2.15, gap:340, types:['spike','gap','saw','triple']},
+            // L7 — Phase 5 Worterweiterung 4 Buchstaben
+            {sn:1160, words:['fall','fass','lass','dass','jass','kalk','saal','falls'],
+             speed:2.32, gap:320, types:['spike','gap','saw','triple','diamond']},
+            // L8 — Phase 6 lange Wörter und Wortketten-Material
+            {sn:1440, words:['falls','salsa','skala','kalk','saal','jass','lass','fass','dass'],
+             speed:2.5,  gap:300, types:['spike','gap','saw','triple','diamond']},
         ],
         astro:[
             {sn:0,    se:160, as:0.36, wm:1},
@@ -276,6 +295,11 @@
     let paused = false, pauseStart = 0, totalPauseMs = 0;
     let helperTimer = null;
     let stars = mkS(140), parts = [], flts = [];
+
+    /* V2.1: Shuffle-Bag-Zustand für Type-Dash */
+    let dashWordBag = [];
+    let dashLastLvl = -1;
+    let dashLastWord = '';
 
     /* ── Level-Up Banner ──────────────────────── */
     let lvlBannerTimer = null;
@@ -368,7 +392,7 @@
         D.bestBeat.textContent = pb.beat>0?`⭐ ${pb.beat}`:'—';
     }
 
-    /* ── Pause-System (V2 NEU) ────────────────── */
+    /* ── Pause-System (V2) ────────────────── */
     function togglePause(){
         if (gs !== 'PLAYING') return;
         if (!paused) {
@@ -398,9 +422,33 @@
     D.quitBtn.addEventListener('click', quitToSummary);
 
     /* ── Type Dash ────────────────────────────── */
+
+    /* V2.1: Shuffle-Bag-Wortauswahl
+       Fisher-Yates-Shuffle des kompletten Wortpools des aktuellen Levels.
+       Jedes Wort wird einmal verwendet, bevor der Bag neu gemischt wird.
+       Bei Levelwechsel oder leerem Bag wird neu gefüllt.
+       Direkte Wiederholungen am Bag-Übergang werden abgefangen. */
     function chW(){
         const c = lvl('dash', score);
-        dg.word = c.words[Math.floor(Math.random()*c.words.length)];
+
+        if (c.level !== dashLastLvl || dashWordBag.length === 0) {
+            dashLastLvl = c.level;
+            dashWordBag = [...c.words];
+            // Fisher-Yates shuffle
+            for (let i = dashWordBag.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [dashWordBag[i], dashWordBag[j]] = [dashWordBag[j], dashWordBag[i]];
+            }
+            // Falls am Übergang dasselbe Wort wie zuletzt vorne liegt, weiter hinten einsortieren
+            if (dashWordBag.length > 1 && dashWordBag[dashWordBag.length - 1] === dashLastWord) {
+                const head = dashWordBag.pop();
+                dashWordBag.splice(0, 0, head);
+            }
+        }
+
+        const next = dashWordBag.pop();
+        dashLastWord = next;
+        dg.word = next;
         dg.typed = '';
         rndW();
     }
@@ -431,6 +479,8 @@
         score=0; clvl=1; st={s:0,h:0,e:0}; el=15; rStart=Date.now(); totalPauseMs=0;
         dg.speed=1.5; dg.bgO=0; dg.mtO=0; dg.ctO=0; dg.obs=[];
         const p=dg.p; p.y=dg.groundY-p.h; p.dy=0; p.jumping=false; p.rotation=0; p.trail=[];
+        // V2.1: Shuffle-Bag bei jedem Spielstart zurücksetzen
+        dashWordBag = []; dashLastLvl = -1; dashLastWord = '';
         chW(); spO();
         setH('Tippe den Buchstaben um zu springen! ESC = Pause', true);
         updH('TYPE DASH');
